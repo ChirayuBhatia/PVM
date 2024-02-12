@@ -47,10 +47,10 @@ def success():
         merger = pypdf.PdfMerger()
         for f in files:
             if not f.filename.endswith(".pdf"):
-                if f.filename.endswith(".docx") or f.filename.endswith(".doc"):
-                    f = docx2pdf.convert(f)
-                else:
-                    f = img2pdf.convert(f, rotation=img2pdf.Rotation.ifvalid)
+                # if f.filename.endswith(".docx") or f.filename.endswith(".doc"):
+                #     f = docx2pdf.convert(f)
+                # else:
+                f = img2pdf.convert(f, rotation=img2pdf.Rotation.ifvalid)
                 merger.append(BytesIO(f))
             else:
                 merger.append(BytesIO(f.read()))
