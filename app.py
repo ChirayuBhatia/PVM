@@ -68,5 +68,5 @@ def get_files(fid):
     return send_file(BytesIO(pdf_entry.file), as_attachment=True, download_name=f'{fid}.pdf')
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+# if __name__ == '__main__':
+#     app.run(debug=True, host='0.0.0.0', port=5000)
