@@ -1,8 +1,5 @@
 from flask import render_template, request, Flask, send_file
 from flask_sqlalchemy import SQLAlchemy
-import img2pdf
-import docx2pdf
-import pypdf
 import qrcode
 from io import BytesIO
 
@@ -11,12 +8,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 db = SQLAlchemy(app)
 
 
-class PDF(db.Model):
-    id = db.Column(db.String, primary_key=True)
+class Files(db.Model):
+    sno = db.Column(db.Integer, primary_key=True)
+    fid = db.Column(db.String, nullable=False)
+    count = db.Column(db.Integer, nullable=False)
+    extension = db.Column(db.String, nullable=False)
     file = db.Column(db.LargeBinary, nullable=False)
 
+
 with app.app_context():
+    db.drop_all()
     db.create_all()
+    db.session.commit()
 
 
 @app.route('/')
@@ -44,32 +47,40 @@ def get_qr_code(pdf_id):
 def success():
     if request.method == 'POST':
         files = request.files.getlist('files[]')
-        merger = pypdf.PdfMerger()
+        sno = Files.query.count()
+        fid = '1' if sno == 0 else str(int(Files.query.get(sno).fid)+1)
+        count = len(files)
         for f in files:
-            if not f.filename.endswith(".pdf"):
-                # if f.filename.endswith(".docx") or f.filename.endswith(".doc"):
-                #     f = docx2pdf.convert(f)
-                # else:
-                f = img2pdf.convert(f, rotation=img2pdf.Rotation.ifvalid)
-                merger.append(BytesIO(f))
-            else:
-                merger.append(BytesIO(f.read()))
-        op = BytesIO()
-        merger.write(op)
-        op.seek(0)
-        pdf_id = PDF.query.count() + 1
-        db.session.add(PDF(id=pdf_id, file=op.read()))
+            sno += 1
+            count -= 1
+            db.session.add(Files(sno=sno, fid=fid, count=count, file=f.read(), extension=f.filename.rsplit('.')[-1]))
         db.session.commit()
-        qr_code_url = f'/get_qr_code/{pdf_id}'
-        return render_template("Acknowledgement.html", name=[f.filename for f in files],
-                               qr_code_url=qr_code_url)
+        qr_code_url = f'/get_qr_code/{fid}'
+        return render_template("Acknowledgement.html", name="File", qr_code_url=qr_code_url)
 
 
-@app.route('/get_file/<fid>', methods=['GET'])
-def get_files(fid):
-    pdf_entry = PDF.query.get(fid)
-    return send_file(BytesIO(pdf_entry.file), as_attachment=True, download_name=f'{fid}.pdf')
+@app.route('/checkqr', methods=['POST'])
+def checkqr():
+    try:
+        fid = eval(request.args.get('text'))["fid"]
+        res = Files.query.filter_by(fid=fid).count()
+        print(res)
+        if res:
+            return {"fid": fid, "count": res}
+        else:
+            return "Invalid"
+    except:
+        return "Invalid"
 
 
-# if __name__ == '__main__':
-#     app.run(debug=True, host='0.0.0.0', port=5000)
+@app.route('/get_file', methods=['GET'])
+def get_files():
+    fid = request.args.get("fid")
+    count = request.args.get("count")
+    print(fid, count)
+    pdf_entry = Files.query.filter_by(fid=fid, count=count).first()
+    return send_file(BytesIO(pdf_entry.file), as_attachment=True, download_name=pdf_entry.extension)
+
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
